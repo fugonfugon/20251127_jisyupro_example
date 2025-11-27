@@ -1,0 +1,10 @@
+backward_compatibility
+port_datasets
+lekiwi
+phone_to_so100
+training
+tutorial
+yoloe-11s-seg
+*.pt
+*.ts
+so100_to_so100_EE
