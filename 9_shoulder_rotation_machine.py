@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """
+9_shoulder_rotation_machine.py
+
 Simplified keyboard control for SO100/SO101 robot
 Fixed action format conversion issues
 Uses P control, keyboard only changes target joint angles
@@ -21,9 +23,9 @@ logger = logging.getLogger(__name__)
 #position config
 TRACKER_CFG = {
     "init": {
-        "shoulder_pan_deg": 0.0,  # ←★あとで実測値に置き換えてください
-        "x": 0.1329,              # ←★あとで実測値(m)に置き換えてください
-        "y": 0.0831,              # ←★あとで実測値(m)に置き換えてください
+        "shoulder_pan_deg": 0.0, 
+        "x": 0.1329,            
+        "y": 0.0831,              
     },
 }
 
@@ -476,12 +478,12 @@ def move_single_joint(robot, joint_name, target_deg, duration=3.0, kp=0.5):
     # 初期状態取得 → 他軸はこの値で設定
     current_obs = robot.get_observation()
     target_positions = {}
-
+    
     for key, value in current_obs.items():
         if key.endswith('.pos'):
             motor_name = key.removesuffix('.pos')
             calibrated = apply_joint_calibration(motor_name, value)
-            target_positions[motor_name] = calibrated
+            target_positions[motor_name] =0.0 #calibrated
 
     # 動かす軸だけ目標値更新
     target_positions[joint_name] = target_deg
@@ -600,23 +602,50 @@ def main():
 
     # ここまで初期設定   
      
+    #ここで一連の行動指南 
         wait_enter("ZERO position completed. Press ENTER to move to INITIAL position...")
         move_to_initial_position(robot, duration=3.0, kp=0.5)
 
-        wait_enter("Initial position completed. Press ENTER to move shoulder_pan = +95 ...")
+        # motion 1
+        wait_enter("Initial position completed. Press ENTER to move shoulder_pan = +... ...")
         move_single_joint(robot, "shoulder_pan", 95, duration=3.0, kp=0.5)
-
-        wait_enter("Shoulder_pan +95 done. Press ENTER to move shoulder_pan = -75 ...")
+        wait_enter("Shoulder_pan +95 done. Press ENTER to move shoulder_pan = -... ...")
         # 早くしたいならduration（s）を調整.
-        move_single_joint(robot, "shoulder_pan", -75, duration=3.0, kp=0.5)
+        move_single_joint(robot, "shoulder_pan", -30, duration=3.0, kp=1.0)
 
-        wait_enter("Shoulder_pan -75 done. Press ENTER to DISCONNECT robot.")
+        # motion 2
+        wait_enter("Initial position completed. Press ENTER to move shoulder_pan = +... ...")
+        move_single_joint(robot, "shoulder_pan", 95, duration=3.0, kp=0.5)
+        wait_enter("Shoulder_pan +95 done. Press ENTER to move shoulder_pan = -... ...")
+        # 早くしたいならduration（s）を調整.
+        move_single_joint(robot, "shoulder_pan", -30, duration=2.0, kp=1.0)
+
+        # motion 3
+        wait_enter("Initial position completed. Press ENTER to move shoulder_pan = +... ...")
+        move_single_joint(robot, "shoulder_pan", 95, duration=3.0, kp=0.5)
+        wait_enter("Shoulder_pan +95 done. Press ENTER to move shoulder_pan = -... ...")
+        # 早くしたいならduration（s）を調整.
+        move_single_joint(robot, "shoulder_pan", -30, duration=2.0, kp=1.25)
         
+        
+        wait_enter("Shoulder_pan -75 done. Press ENTER to DISCONNECT robot.")
         robot.disconnect()
         keyboard.disconnect()
         print("Robot power released. Program finished.")
         return
 
+
+        """
+        角度参考
+        zero_positions = {
+            'shoulder_pan': 0.0, #外100, 内-95
+            'shoulder_lift': 0.0, #上-100, 下100
+            'elbow_flex': 0.0,  #上-100, 下100
+            'wrist_flex': 0.0, #上-100, 下100
+            'wrist_roll': 0.0,#-80右回転, 150左回転 単位度
+            'gripper': 0.0 #閉じ0, 開き100
+        }
+        """
 
 
         """
