@@ -192,7 +192,7 @@ def move_to_zero_position(robot, duration=3.0, kp=0.5):
             if key.endswith('.pos'):
                 motor_name = key.removesuffix('.pos')
                 # Apply calibration coefficients
-                calibrated_value = apply_joint_calibration(motor_name, value)
+                calibrated_value = apply_joint_calibration(motor_name, value)#あやしい
                 current_positions[motor_name] = calibrated_value
         
         # P control calculation
@@ -525,7 +525,7 @@ TRACKER_CFG = {
     # 検出ロスト判定 & 探索動作（SEARCH状態）設定
     "conf_min": 0.4,
     "lost_timeout_s": 0.5,     # この秒数YOLO更新が無ければLOST扱い
-    "search_speed_deg_s": 0.1,#20  # 探索時の肩回転の角速度（deg/s）
+    "search_speed_deg_s": 0.00001,#20  # 探索時の肩回転の角速度（deg/s）
     "search_span_deg": 100,    # 探索の振り幅（±50°）
 
     # ループ周波数・YOLO軽量化（CPU向け）
@@ -538,14 +538,15 @@ def clip(val, lo, hi):
     """数値を [lo, hi] にクリップする小道具（安全対策）"""
     return max(lo, min(hi, val))
 
+"""
 def sweep_pan(current_deg, span_deg, speed_deg_s, dt):
-    """
-    探索時に肩を左右に振るための「単純スイープ」。
-    - current_deg: 現在の肩角度（deg）
-    - span_deg   : 総振幅（例：100 -> -50°〜+50°）
-    - speed_deg_s: 回す速度（deg/s）
-    - dt         : 経過時間（s）
-    """
+    
+    #探索時に肩を左右に振るための「単純スイープ」。
+    #- current_deg: 現在の肩角度（deg）
+    #- span_deg   : 総振幅（例：100 -> -50°〜+50°）
+    #-speed_deg_s: 回す速度（deg/s）
+    #- dt         : 経過時間（s）
+    
     # 振り子のように往復させるため、角度の進行方向を保持
     if not hasattr(sweep_pan, "_dir"):
         sweep_pan._dir = 1  # 1:正方向, -1:反対方向
@@ -561,6 +562,7 @@ def sweep_pan(current_deg, span_deg, speed_deg_s, dt):
         next_deg = sweep_pan._center - half
         sweep_pan._dir = 1
     return next_deg
+"""
 
 @dataclass
 class Detection:
@@ -788,10 +790,10 @@ def auto_track_loop(
             lost = (not det.found) or ((time.time() - det.t_update) > cfg["lost_timeout_s"]) or (det.conf < cfg["conf_min"])
 
             if state == "SEARCH":
-                if not lost:
-                    state = "TRACK"
+                #if not lost:
+                state = "TRACK"
+                """
                 else:
-                    # 肩をスイープして探索（deg/s * dt 分だけ動かす）
                     pan_deg = sweep_pan(
                         pan_deg,
                         cfg["search_span_deg"],
@@ -800,7 +802,7 @@ def auto_track_loop(
                     )
                     pan_deg = clip(pan_deg, cfg["pan_limits_deg"][0], cfg["pan_limits_deg"][1])
                     target_positions["shoulder_pan"] = pan_deg
-
+                """
             else:
                 if lost:
                     # 見失ったら探索へ戻る
@@ -814,7 +816,7 @@ def auto_track_loop(
                     # --- 横方向：肩回転で補正 ---
                     # 画像の横ずれを肩角度に変換して足し込む（FOVでスケール調整しても良い）
                     pan_deg += cfg["K_pan"] * eu # たぶん逆だったので修正
-                    pan_deg = clip(pan_deg, cfg["pan_limits_deg"][0], cfg["pan_limits_deg"][1])
+                    #pan_deg = clip(pan_deg, cfg["pan_limits_deg"][0], cfg["pan_limits_deg"][1])
                     target_positions["shoulder_pan"] = pan_deg
 
                     # --- 縦方向：y座標で補正（2リンクIKで lift/elbow へ） ---
@@ -865,13 +867,16 @@ def auto_track_loop(
                 if key.endswith(".pos"):
                     motor_name = key.removesuffix(".pos")
                     # センサ値のキャリブレーションを適用（既存の補正関数を利用）
-                    calibrated_value = apply_joint_calibration(motor_name, value)
+                    calibrated_value = apply_joint_calibration(motor_name, value)#これも怪しい#今の値を補正かけて取得している。
                     current_positions[motor_name] = calibrated_value
 
             # P制御：目標へ少しずつ寄せる（急激な動きにならないよう kp は低め）
-            kp = 0.5
+            kp = 0.1
             robot_action = {}
+            #ここがおかしい！！
+            
             for joint_name, target_pos in target_positions.items():
+                target_pos = apply_joint_calibration(joint_name, target_pos)#本当にこれでいいか一番怪しい（自分で足した）
                 if joint_name in current_positions:
                     current_pos = current_positions[joint_name]
                     error = target_pos - current_pos
@@ -884,7 +889,8 @@ def auto_track_loop(
 
             # ログ（1秒おき程度）
             if int(time.time()) % 1 == 0:
-                print(f"[CTRL] state={state} pan={pan_deg:.1f} x={x:.3f} y={y:.3f}")
+                print(f"[CTRL] state={state} pan={pan_deg:.1f} x={x:.3f} y={y:.3f} {target_positions["shoulder_pan"]}")
+                print(f"{robot_action}")
 
             # 制御周期の維持
             elapsed = time.time() - t0
@@ -912,6 +918,13 @@ def main():
     """Main function"""
     print("LeRobot Keyboard Control + Independent YOLO Display")
     print("="*60)
+
+    """
+    if hasattr(sweep_pan, "_dir"):
+        del sweep_pan._dir
+    if hasattr(sweep_pan, "_center"):
+        del sweep_pan._center
+    """
     
     try:
         # Import necessary modules
@@ -1040,6 +1053,11 @@ def main():
 
         # ---- 旧：video_stream_loop → 新：yolo_detection_loop（CPU軽量化＆共有状態に格納）----
         # 画面表示が重い場合は show_window=False にしてください。
+
+        target_positions["shoulder_pan"] = 0.0
+        robot.send_action({"shoulder_pan.pos": 0.0})
+        time.sleep(0.5)
+
         yolo_thread = threading.Thread(
             target=yolo_detection_loop, args=(model, cap, target_objects, shared_state), kwargs={"show_window": True}, daemon=True
             #target=yolo_detection_loop, args=(model, cap, target_objects, shared_state), kwargs={"show_window": False}, daemon=True

@@ -516,6 +516,27 @@ def move_single_joint(robot, joint_name, target_deg, duration=3.0, kp=0.5):
     print(f"{joint_name} reached {target_deg}° (approx.)")
 
 
+def move_single_joint_2(robot, joint_name, target_deg, duration=3.0, kp=0.5):
+    control_freq = 50
+    total_steps = int(duration * control_freq)
+    step_time = 1.0 / control_freq
+
+    current_obs = robot.get_observation()
+    current_key = f"{joint_name}.pos"
+    if current_key not in current_obs:
+        print(f"Error: Joint '{joint_name}' not found.")
+        return
+
+    start_deg = apply_joint_calibration(joint_name, current_obs[current_key])
+
+    for step in range(total_steps):
+        t = step / total_steps
+        interp_deg = start_deg + (target_deg - start_deg) * t
+        robot.send_action({current_key: interp_deg})
+        time.sleep(step_time)
+
+    robot.send_action({current_key: target_deg})
+    print(f"[DONE] {joint_name} reached {target_deg}° directly.")
 
 
 # enter押されるの待ち関数
@@ -603,30 +624,44 @@ def main():
     # ここまで初期設定   
      
     #ここで一連の行動指南 
-        wait_enter("ZERO position completed. Press ENTER to move to INITIAL position...")
-        move_to_initial_position(robot, duration=3.0, kp=0.5)
+        #wait_enter("ZERO position completed. Press ENTER to move to INITIAL position...")
+        #move_to_initial_position(robot, duration=3.0, kp=0.5)
+
 
         # motion 1
+        """
         wait_enter("Initial position completed. Press ENTER to move shoulder_pan = +... ...")
         move_single_joint(robot, "shoulder_pan", 95, duration=3.0, kp=0.5)
         wait_enter("Shoulder_pan +95 done. Press ENTER to move shoulder_pan = -... ...")
         # 早くしたいならduration（s）を調整.
         move_single_joint(robot, "shoulder_pan", -30, duration=3.0, kp=1.0)
-
+        """
+        """
         # motion 2
         wait_enter("Initial position completed. Press ENTER to move shoulder_pan = +... ...")
         move_single_joint(robot, "shoulder_pan", 95, duration=3.0, kp=0.5)
         wait_enter("Shoulder_pan +95 done. Press ENTER to move shoulder_pan = -... ...")
         # 早くしたいならduration（s）を調整.
         move_single_joint(robot, "shoulder_pan", -30, duration=2.0, kp=1.0)
-
+        """
+        """
         # motion 3
         wait_enter("Initial position completed. Press ENTER to move shoulder_pan = +... ...")
         move_single_joint(robot, "shoulder_pan", 95, duration=3.0, kp=0.5)
         wait_enter("Shoulder_pan +95 done. Press ENTER to move shoulder_pan = -... ...")
         # 早くしたいならduration（s）を調整.
         move_single_joint(robot, "shoulder_pan", -30, duration=2.0, kp=1.25)
-        
+        """
+        for i in range (10):
+            wait_enter("Takeback is completed. please press ENTER to next action")
+            robot.send_action({"shoulder_pan.pos": 70})
+            wait_enter("Forehand is completed. please press ENTER to next action")
+            robot.send_action({"shoulder_pan.pos": -30})
+
+
+
+
+
         
         wait_enter("Shoulder_pan -75 done. Press ENTER to DISCONNECT robot.")
         robot.disconnect()
